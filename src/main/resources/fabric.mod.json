@@ -7,6 +7,7 @@
   "authors": ["rackeldevs"],
   "contact": {},
   "license": "MIT",
+  "icon": "assets/hotbarsaver/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
