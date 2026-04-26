@@ -3,19 +3,25 @@
   "id": "hotbarsaver",
   "version": "1.0.0",
   "name": "Hotbar Saver",
-  "description": "Save and restore your hotbar in any gamemode using F6/F7.",
-  "authors": ["You"],
+  "description": "Save and restore your hotbar in any gamemode.",
+  "authors": ["rackeldevs, AdityaK"],
   "contact": {},
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
     "client": [
       "com.hotbarsaver.HotbarSaver"
+    ],
+    "modmenu": [
+      "com.hotbarsaver.HotbarModMenuIntegration"
     ]
   },
   "depends": {
     "fabricloader": ">=0.16.0",
     "fabric-api": "*",
     "minecraft": "~1.21.8"
+  },
+  "suggests": {
+    "modmenu": "*"
   }
 }
