@@ -1,4 +1,4 @@
-# Hotbar Saver — Fabric Mod
+# GMS Hotbar Saving by rackeldevs
 
 Save and restore your hotbar in **any gamemode** (Survival, Creative, Adventure).  
 Works exactly like vanilla's creative hotbar saving, but without the Creative Mode restriction.
@@ -7,21 +7,21 @@ Works exactly like vanilla's creative hotbar saving, but without the Creative Mo
 
 | Key | Action |
 |-----|--------|
-| **F6** | Save your current hotbar → writes to `.minecraft/hotbar.nbt` |
-| **F7** | Restore your saved hotbar → reads from `.minecraft/hotbar.nbt` |
+| **F6** | Save your current hotbar → writes to `%MINECRAFTDIR%/hotbar.nbt` |
+| **F7** | Restore your saved hotbar → reads from `%MINECRAFTDIR%/hotbar.nbt` |
 
 Both keys are rebindable in **Options → Controls → Hotbar Saver**.
 
 ## How it works
 
-Vanilla Minecraft stores saved hotbars in `.minecraft/hotbar.nbt`.  
-This mod writes and reads that same file — meaning:
+Vanilla Minecraft stores saved hotbars in `%MINECRAFTDIR%/hotbar.nbt`.  
+This mod writes and reads the same file, without the restriction of GMC
 
 - ✅ Hotbars saved here are **compatible with vanilla creative load** (and vice versa)
 - ✅ Works across different servers (save on Server A, load on Server B)
 - ✅ Client-side only — no server mod/plugin needed
 
-## Building
+## Installation/Building
 
 Requirements: **JDK 21**, internet connection (first build downloads Minecraft mappings)
 
