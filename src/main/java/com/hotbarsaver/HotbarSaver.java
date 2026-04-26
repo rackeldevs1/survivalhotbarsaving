@@ -12,6 +12,7 @@ import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -35,7 +36,6 @@ public class HotbarSaver implements ClientModInitializer {
     public void onInitializeClient() {
         HotbarConfig.load();
 
-        // 1.21.9+: KeyBinding.Category uses Identifier, not a String or Text
         KeyBinding.Category category = KeyBinding.Category.create(
                 Identifier.of("hotbarsaver", "general")
         );
@@ -89,6 +89,17 @@ public class HotbarSaver implements ClientModInitializer {
         // Keys are read live from config each tick — nothing to rebuild
     }
 
+    /**
+     * Get the registry manager from the world, not the player.
+     * This ensures dynamic registries (enchantments, etc.) are fully resolved
+     * on both singleplayer and multiplayer servers.
+     */
+    private static RegistryWrapper.WrapperLookup getRegistries(MinecraftClient client) {
+        // client.player.getEntityWorld() gives us the full dynamic registry
+        // including server-synced enchantments, biomes, etc.
+        return client.player.getEntityWorld().getRegistryManager();
+    }
+
     private static void saveHotbar(MinecraftClient client, int slot) {
         try {
             File hotbarFile = getHotbarFile(client);
@@ -100,7 +111,9 @@ public class HotbarSaver implements ClientModInitializer {
                 root = new NbtCompound();
             }
 
-            var registryOps = client.player.getRegistryManager().getOps(NbtOps.INSTANCE);
+            // Use world registry manager — resolves dynamic registries like enchantments
+            var registryOps = getRegistries(client).getOps(NbtOps.INSTANCE);
+
             NbtList hotbarList = new NbtList();
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = client.player.getInventory().getStack(i);
@@ -142,7 +155,9 @@ public class HotbarSaver implements ClientModInitializer {
                 return;
             }
 
-            var registryOps = client.player.getRegistryManager().getOps(NbtOps.INSTANCE);
+            // Use world registry manager — resolves dynamic registries like enchantments
+            var registryOps = getRegistries(client).getOps(NbtOps.INSTANCE);
+
             NbtList hotbarList = root.getList(String.valueOf(slot)).orElse(new NbtList());
             int count = Math.min(hotbarList.size(), 9);
 
