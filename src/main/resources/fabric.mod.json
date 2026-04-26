@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "name": "Hotbar Saver",
   "description": "Save and restore your hotbar in any gamemode.",
-  "authors": ["rackeldevs, AdityaK"],
+  "authors": ["rackeldevs"],
   "contact": {},
   "license": "MIT",
   "environment": "client",
@@ -17,9 +17,9 @@
     ]
   },
   "depends": {
-    "fabricloader": ">=0.16.0",
+    "fabricloader": ">=0.18.0",
     "fabric-api": "*",
-    "minecraft": "~1.21.8"
+    "minecraft": "~1.21.11"
   },
   "suggests": {
     "modmenu": "*"
