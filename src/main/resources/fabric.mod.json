@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "hotbarsaver",
+  "version": "1.0.0",
+  "name": "Hotbar Saver",
+  "description": "Save and restore your hotbar in any gamemode using F6/F7.",
+  "authors": ["You"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.hotbarsaver.HotbarSaver"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "~1.21.8"
+  }
+}
