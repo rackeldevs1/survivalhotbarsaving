@@ -74,8 +74,18 @@ public class HotbarConfigScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Draw a simple dark translucent background manually
+        // instead of calling super.renderBackground() which triggers
+        // a double-blur crash with VulkanMod
+        context.fillGradient(0, 0, this.width, this.height, 0xC0101010, 0xD0101010);
+    }
+
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Manually draw background first (no super.renderBackground call)
         this.renderBackground(context, mouseX, mouseY, delta);
+
         int centerX = this.width / 2;
         int startY = this.height / 2 - 60;
 
@@ -112,6 +122,7 @@ public class HotbarConfigScreen extends Screen {
         context.drawCenteredTextWithShadow(this.textRenderer,
                 Text.literal("Made by rackeldevs"), centerX, startY + 140, 0xFF888888);
 
+        // Draw widgets (text fields, buttons) AFTER background
         super.render(context, mouseX, mouseY, delta);
     }
 
