@@ -124,7 +124,8 @@ public class HotbarSaver implements ClientModInitializer {
 
             if (!hotbarFile.exists()) {
                 client.player.sendMessage(Text.literal("✘ No saved hotbars found. Use "
-                        + HotbarConfig.get().saveModifier + "+1~9 to save first.").formatted(Formatting.YELLOW), true);
+                        + HotbarConfig.get().saveModifier + "+1~9 to save first.")
+                        .formatted(Formatting.YELLOW), true);
                 return;
             }
 
