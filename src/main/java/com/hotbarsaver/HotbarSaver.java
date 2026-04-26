@@ -16,7 +16,6 @@ import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 
 public class HotbarSaver implements ClientModInitializer {
 
@@ -25,7 +24,6 @@ public class HotbarSaver implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        // Register keybindings
         saveKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.hotbarsaver.save",
                 InputUtil.Type.KEYSYM,
@@ -40,7 +38,6 @@ public class HotbarSaver implements ClientModInitializer {
                 "category.hotbarsaver"
         ));
 
-        // Tick event to detect key presses
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
 
@@ -54,14 +51,8 @@ public class HotbarSaver implements ClientModInitializer {
         });
     }
 
-    /**
-     * Saves the player's current hotbar (slots 0-8) to hotbar.nbt,
-     * using the exact same format as vanilla creative mode hotbar saving.
-     * Slot index 0 = first saved hotbar slot (like pressing X on slot 1 in creative).
-     */
     private void saveHotbar(MinecraftClient client) {
         try {
-            // Read existing hotbar.nbt or create fresh
             File hotbarFile = getHotbarFile(client);
             NbtCompound root;
 
@@ -72,50 +63,38 @@ public class HotbarSaver implements ClientModInitializer {
                 root = new NbtCompound();
             }
 
-            // Build a NbtList of 9 item stacks (slots 0–8 of player inventory)
             NbtList hotbarList = new NbtList();
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = client.player.getInventory().getStack(i);
-                NbtCompound itemTag = new NbtCompound();
-                // encodeAllComponents writes the full item NBT including components
-                stack.encode(client.player.getRegistryManager(), itemTag);
+                // FIX 1: toNbt() replaces encode() in 1.21.8
+                NbtCompound itemTag = (NbtCompound) stack.toNbt(client.player.getRegistryManager());
                 hotbarList.add(itemTag);
             }
 
-            // Vanilla stores saved hotbars as "0" through "8" (9 hotbar slots saved)
-            // We save to slot "0" (the first saved hotbar) by default
             root.put("0", hotbarList);
-
             NbtIo.write(root, hotbarFile.toPath());
 
             client.player.sendMessage(
-                    Text.literal("✔ Hotbar saved! (F7 to restore)")
-                            .formatted(Formatting.GREEN),
-                    true // action bar
+                    Text.literal("✔ Hotbar saved! (F7 to restore)").formatted(Formatting.GREEN),
+                    true
             );
 
         } catch (IOException e) {
             client.player.sendMessage(
-                    Text.literal("✘ Failed to save hotbar: " + e.getMessage())
-                            .formatted(Formatting.RED),
+                    Text.literal("✘ Failed to save hotbar: " + e.getMessage()).formatted(Formatting.RED),
                     true
             );
             e.printStackTrace();
         }
     }
 
-    /**
-     * Loads the hotbar from hotbar.nbt slot "0" and applies it
-     * to the player's current hotbar inventory slots 0–8.
-     */
     private void loadHotbar(MinecraftClient client) {
         try {
             File hotbarFile = getHotbarFile(client);
 
             if (!hotbarFile.exists()) {
                 client.player.sendMessage(
-                        Text.literal("✘ No saved hotbar found. Press F6 to save one first.")
-                                .formatted(Formatting.YELLOW),
+                        Text.literal("✘ No saved hotbar found. Press F6 to save one first.").formatted(Formatting.YELLOW),
                         true
                 );
                 return;
@@ -124,47 +103,42 @@ public class HotbarSaver implements ClientModInitializer {
             NbtCompound root = NbtIo.read(hotbarFile.toPath());
             if (root == null || !root.contains("0")) {
                 client.player.sendMessage(
-                        Text.literal("✘ Saved hotbar data is empty or corrupt.")
-                                .formatted(Formatting.RED),
+                        Text.literal("✘ Saved hotbar data is empty or corrupt.").formatted(Formatting.RED),
                         true
                 );
                 return;
             }
 
-            NbtList hotbarList = root.getList("0", 10); // 10 = NbtCompound type
+            // FIX 2: getList() no longer takes a type int argument in 1.21.8
+            NbtList hotbarList = root.getList("0");
             int count = Math.min(hotbarList.size(), 9);
 
             for (int i = 0; i < count; i++) {
-                NbtCompound itemTag = hotbarList.getCompound(i);
-                ItemStack stack = ItemStack.fromNbt(client.player.getRegistryManager(), itemTag)
-                        .orElse(ItemStack.EMPTY);
+                // FIX 3: getCompound() returns Optional<NbtCompound> now
+                NbtCompound itemTag = hotbarList.getCompound(i).orElse(new NbtCompound());
+                // FIX 4: fromNbtOrEmpty() replaces fromNbt() in 1.21.8
+                ItemStack stack = ItemStack.fromNbtOrEmpty(client.player.getRegistryManager(), itemTag);
                 client.player.getInventory().setStack(i, stack);
             }
 
-            // Sync inventory to server
             client.player.playerScreenHandler.sendContentUpdates();
 
             client.player.sendMessage(
-                    Text.literal("✔ Hotbar restored!")
-                            .formatted(Formatting.GREEN),
+                    Text.literal("✔ Hotbar restored!").formatted(Formatting.GREEN),
                     true
             );
 
         } catch (IOException e) {
             client.player.sendMessage(
-                    Text.literal("✘ Failed to load hotbar: " + e.getMessage())
-                            .formatted(Formatting.RED),
+                    Text.literal("✘ Failed to load hotbar: " + e.getMessage()).formatted(Formatting.RED),
                     true
             );
             e.printStackTrace();
         }
     }
 
-    /**
-     * Returns the hotbar.nbt file path — same location vanilla uses:
-     * .minecraft/hotbar.nbt
-     */
     private File getHotbarFile(MinecraftClient client) {
-        return client.runDirectory.resolve("hotbar.nbt").toFile();
+        // FIX 5: runDirectory is a File, not a Path — use new File() instead of .resolve()
+        return new File(client.runDirectory, "hotbar.nbt");
     }
 }
