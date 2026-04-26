@@ -1,5 +1,4 @@
 {
-  "key.hotbarsaver.save": "Save Hotbar",
-  "key.hotbarsaver.load": "Load Hotbar",
-  "category.hotbarsaver": "Hotbar Saver"
+  "category.hotbarsaver": "Hotbar Saver",
+  "key.hotbarsaver.openconfig": "Open Hotbar Saver Config"
 }
