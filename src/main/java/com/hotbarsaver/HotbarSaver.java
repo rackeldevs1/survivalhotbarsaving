@@ -14,6 +14,7 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
@@ -34,11 +35,16 @@ public class HotbarSaver implements ClientModInitializer {
     public void onInitializeClient() {
         HotbarConfig.load();
 
+        // 1.21.9+: KeyBinding.Category uses Identifier, not a String or Text
+        KeyBinding.Category category = KeyBinding.Category.create(
+                Identifier.of("hotbarsaver", "general")
+        );
+
         openConfigKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.hotbarsaver.openconfig",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_H,
-                "category.hotbarsaver"
+                category
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
