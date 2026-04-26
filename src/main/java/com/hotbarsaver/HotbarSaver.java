@@ -10,6 +10,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.lwjgl.glfw.GLFW;
@@ -40,34 +41,27 @@ public class HotbarSaver implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
-
-            while (saveKey.wasPressed()) {
-                saveHotbar(client);
-            }
-
-            while (loadKey.wasPressed()) {
-                loadHotbar(client);
-            }
+            while (saveKey.wasPressed()) saveHotbar(client);
+            while (loadKey.wasPressed()) loadHotbar(client);
         });
     }
 
     private void saveHotbar(MinecraftClient client) {
         try {
             File hotbarFile = getHotbarFile(client);
-            NbtCompound root;
+            NbtCompound root = hotbarFile.exists()
+                    ? NbtIo.read(hotbarFile.toPath())
+                    : null;
+            if (root == null) root = new NbtCompound();
 
-            if (hotbarFile.exists()) {
-                root = NbtIo.read(hotbarFile.toPath());
-                if (root == null) root = new NbtCompound();
-            } else {
-                root = new NbtCompound();
-            }
+            var registryOps = client.player.getRegistryManager().getOps(NbtOps.INSTANCE);
 
             NbtList hotbarList = new NbtList();
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = client.player.getInventory().getStack(i);
-                // FIX 1: toNbt() replaces encode() in 1.21.8
-                NbtCompound itemTag = (NbtCompound) stack.toNbt(client.player.getRegistryManager());
+                NbtCompound itemTag = new NbtCompound();
+                // 1.21.5+ encoding: use MAP_CODEC with RegistryOps
+                itemTag.copyFromCodec(ItemStack.MAP_CODEC, registryOps, stack);
                 hotbarList.add(itemTag);
             }
 
@@ -75,15 +69,11 @@ public class HotbarSaver implements ClientModInitializer {
             NbtIo.write(root, hotbarFile.toPath());
 
             client.player.sendMessage(
-                    Text.literal("✔ Hotbar saved! (F7 to restore)").formatted(Formatting.GREEN),
-                    true
-            );
+                    Text.literal("✔ Hotbar saved! (F7 to restore)").formatted(Formatting.GREEN), true);
 
         } catch (IOException e) {
             client.player.sendMessage(
-                    Text.literal("✘ Failed to save hotbar: " + e.getMessage()).formatted(Formatting.RED),
-                    true
-            );
+                    Text.literal("✘ Failed to save hotbar: " + e.getMessage()).formatted(Formatting.RED), true);
             e.printStackTrace();
         }
     }
@@ -94,51 +84,45 @@ public class HotbarSaver implements ClientModInitializer {
 
             if (!hotbarFile.exists()) {
                 client.player.sendMessage(
-                        Text.literal("✘ No saved hotbar found. Press F6 to save one first.").formatted(Formatting.YELLOW),
-                        true
-                );
+                        Text.literal("✘ No saved hotbar found. Press F6 first.").formatted(Formatting.YELLOW), true);
                 return;
             }
 
             NbtCompound root = NbtIo.read(hotbarFile.toPath());
             if (root == null || !root.contains("0")) {
                 client.player.sendMessage(
-                        Text.literal("✘ Saved hotbar data is empty or corrupt.").formatted(Formatting.RED),
-                        true
-                );
+                        Text.literal("✘ Saved hotbar data is empty or corrupt.").formatted(Formatting.RED), true);
                 return;
             }
 
-            // FIX 2: getList() no longer takes a type int argument in 1.21.8
-            NbtList hotbarList = root.getList("0");
+            var registryOps = client.player.getRegistryManager().getOps(NbtOps.INSTANCE);
+
+            // 1.21.5+ getList() returns Optional<NbtList>
+            NbtList hotbarList = root.getList("0").orElse(new NbtList());
             int count = Math.min(hotbarList.size(), 9);
 
             for (int i = 0; i < count; i++) {
-                // FIX 3: getCompound() returns Optional<NbtCompound> now
+                // getCompound() also returns Optional now
                 NbtCompound itemTag = hotbarList.getCompound(i).orElse(new NbtCompound());
-                // FIX 4: fromNbtOrEmpty() replaces fromNbt() in 1.21.8
-                ItemStack stack = ItemStack.fromNbtOrEmpty(client.player.getRegistryManager(), itemTag);
+                // 1.21.5+ decoding: use MAP_CODEC with RegistryOps
+                ItemStack stack = itemTag.decode(ItemStack.MAP_CODEC, registryOps)
+                        .orElse(ItemStack.EMPTY);
                 client.player.getInventory().setStack(i, stack);
             }
 
             client.player.playerScreenHandler.sendContentUpdates();
 
             client.player.sendMessage(
-                    Text.literal("✔ Hotbar restored!").formatted(Formatting.GREEN),
-                    true
-            );
+                    Text.literal("✔ Hotbar restored!").formatted(Formatting.GREEN), true);
 
         } catch (IOException e) {
             client.player.sendMessage(
-                    Text.literal("✘ Failed to load hotbar: " + e.getMessage()).formatted(Formatting.RED),
-                    true
-            );
+                    Text.literal("✘ Failed to load hotbar: " + e.getMessage()).formatted(Formatting.RED), true);
             e.printStackTrace();
         }
     }
 
     private File getHotbarFile(MinecraftClient client) {
-        // FIX 5: runDirectory is a File, not a Path — use new File() instead of .resolve()
         return new File(client.runDirectory, "hotbar.nbt");
     }
 }
