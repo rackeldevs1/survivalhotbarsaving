@@ -14,7 +14,6 @@ public class HotbarConfig {
     private static final Path CONFIG_PATH = FabricLoader.getInstance()
             .getConfigDir().resolve("hotbarsaver.json");
 
-    // Default modifier keys
     public String saveModifier = "X";
     public String loadModifier = "V";
 
@@ -29,7 +28,6 @@ public class HotbarConfig {
         if (CONFIG_PATH.toFile().exists()) {
             try (Reader reader = new FileReader(CONFIG_PATH.toFile())) {
                 instance = GSON.fromJson(reader, HotbarConfig.class);
-                // Validate — fallback to defaults if something is wrong
                 if (instance == null) instance = new HotbarConfig();
                 if (instance.saveModifier == null || instance.saveModifier.length() != 1)
                     instance.saveModifier = "X";
@@ -54,9 +52,6 @@ public class HotbarConfig {
         }
     }
 
-    /**
-     * Converts a single letter like "X" to its GLFW key code.
-     */
     public static int letterToGlfw(String letter) {
         if (letter == null || letter.isEmpty()) return GLFW.GLFW_KEY_X;
         return switch (letter.toUpperCase()) {
