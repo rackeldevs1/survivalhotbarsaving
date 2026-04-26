@@ -8,6 +8,7 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtOps;
@@ -16,113 +17,150 @@ import net.minecraft.util.Formatting;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
-import java.io.IOException;
 
 public class HotbarSaver implements ClientModInitializer {
 
-    private static KeyBinding saveKey;
-    private static KeyBinding loadKey;
+    private static final int[] DIGIT_KEYS = {
+            GLFW.GLFW_KEY_1, GLFW.GLFW_KEY_2, GLFW.GLFW_KEY_3,
+            GLFW.GLFW_KEY_4, GLFW.GLFW_KEY_5, GLFW.GLFW_KEY_6,
+            GLFW.GLFW_KEY_7, GLFW.GLFW_KEY_8, GLFW.GLFW_KEY_9
+    };
+
+    private static KeyBinding openConfigKey;
+    private static final boolean[] saveTriggered = new boolean[9];
+    private static final boolean[] loadTriggered = new boolean[9];
 
     @Override
     public void onInitializeClient() {
-        saveKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.hotbarsaver.save",
-                InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_F6,
-                "category.hotbarsaver"
-        ));
+        HotbarConfig.load();
 
-        loadKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.hotbarsaver.load",
+        openConfigKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.hotbarsaver.openconfig",
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_F7,
+                GLFW.GLFW_KEY_H,
                 "category.hotbarsaver"
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.player == null) return;
-            while (saveKey.wasPressed()) saveHotbar(client);
-            while (loadKey.wasPressed()) loadHotbar(client);
+            if (client.player == null || client.currentScreen != null) return;
+
+            while (openConfigKey.wasPressed()) {
+                client.setScreen(new HotbarConfigScreen(null));
+            }
+
+            long window = client.getWindow().getHandle();
+            int saveGlfw = HotbarConfig.letterToGlfw(HotbarConfig.get().saveModifier);
+            int loadGlfw = HotbarConfig.letterToGlfw(HotbarConfig.get().loadModifier);
+
+            boolean saveHeld = GLFW.glfwGetKey(window, saveGlfw) == GLFW.GLFW_PRESS;
+            boolean loadHeld = GLFW.glfwGetKey(window, loadGlfw) == GLFW.GLFW_PRESS;
+
+            for (int i = 0; i < 9; i++) {
+                boolean digitPressed = GLFW.glfwGetKey(window, DIGIT_KEYS[i]) == GLFW.GLFW_PRESS;
+
+                if (saveHeld && digitPressed) {
+                    if (!saveTriggered[i]) {
+                        saveTriggered[i] = true;
+                        saveHotbar(client, i);
+                    }
+                } else {
+                    saveTriggered[i] = false;
+                }
+
+                if (loadHeld && digitPressed) {
+                    if (!loadTriggered[i]) {
+                        loadTriggered[i] = true;
+                        loadHotbar(client, i);
+                    }
+                } else {
+                    loadTriggered[i] = false;
+                }
+            }
         });
     }
 
-    private void saveHotbar(MinecraftClient client) {
+    public static void reloadKeys() {
+        // Keys are read live from config each tick — nothing to rebuild
+    }
+
+    private static void saveHotbar(MinecraftClient client, int slot) {
         try {
             File hotbarFile = getHotbarFile(client);
-            NbtCompound root = hotbarFile.exists()
-                    ? NbtIo.read(hotbarFile.toPath())
-                    : null;
-            if (root == null) root = new NbtCompound();
+            NbtCompound root;
+            if (hotbarFile.exists()) {
+                root = NbtIo.read(hotbarFile.toPath());
+                if (root == null) root = new NbtCompound();
+            } else {
+                root = new NbtCompound();
+            }
 
             var registryOps = client.player.getRegistryManager().getOps(NbtOps.INSTANCE);
-
             NbtList hotbarList = new NbtList();
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = client.player.getInventory().getStack(i);
-                NbtCompound itemTag = new NbtCompound();
-                // 1.21.5+ encoding: use MAP_CODEC with RegistryOps
-                itemTag.copyFromCodec(ItemStack.MAP_CODEC, registryOps, stack);
-                hotbarList.add(itemTag);
+                NbtElement encoded = ItemStack.CODEC.encodeStart(registryOps, stack).getOrThrow();
+                hotbarList.add(encoded);
             }
 
-            root.put("0", hotbarList);
+            root.put(String.valueOf(slot), hotbarList);
             NbtIo.write(root, hotbarFile.toPath());
 
             client.player.sendMessage(
-                    Text.literal("✔ Hotbar saved! (F7 to restore)").formatted(Formatting.GREEN), true);
+                    Text.literal("✔ Hotbar saved to slot " + (slot + 1)
+                            + " (" + HotbarConfig.get().saveModifier + "+" + (slot + 1)
+                            + ") — Made by rackeldevs").formatted(Formatting.GREEN),
+                    true);
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             client.player.sendMessage(
-                    Text.literal("✘ Failed to save hotbar: " + e.getMessage()).formatted(Formatting.RED), true);
+                    Text.literal("✘ Failed to save: " + e.getMessage()).formatted(Formatting.RED), true);
             e.printStackTrace();
         }
     }
 
-    private void loadHotbar(MinecraftClient client) {
+    private static void loadHotbar(MinecraftClient client, int slot) {
         try {
             File hotbarFile = getHotbarFile(client);
 
             if (!hotbarFile.exists()) {
-                client.player.sendMessage(
-                        Text.literal("✘ No saved hotbar found. Press F6 first.").formatted(Formatting.YELLOW), true);
+                client.player.sendMessage(Text.literal("✘ No saved hotbars found. Use "
+                        + HotbarConfig.get().saveModifier + "+1~9 to save first.").formatted(Formatting.YELLOW), true);
                 return;
             }
 
             NbtCompound root = NbtIo.read(hotbarFile.toPath());
-            if (root == null || !root.contains("0")) {
-                client.player.sendMessage(
-                        Text.literal("✘ Saved hotbar data is empty or corrupt.").formatted(Formatting.RED), true);
+            if (root == null || !root.contains(String.valueOf(slot))) {
+                client.player.sendMessage(Text.literal("✘ Nothing saved in slot " + (slot + 1) + ".")
+                        .formatted(Formatting.YELLOW), true);
                 return;
             }
 
             var registryOps = client.player.getRegistryManager().getOps(NbtOps.INSTANCE);
-
-            // 1.21.5+ getList() returns Optional<NbtList>
-            NbtList hotbarList = root.getList("0").orElse(new NbtList());
+            NbtList hotbarList = root.getList(String.valueOf(slot)).orElse(new NbtList());
             int count = Math.min(hotbarList.size(), 9);
 
             for (int i = 0; i < count; i++) {
-                // getCompound() also returns Optional now
-                NbtCompound itemTag = hotbarList.getCompound(i).orElse(new NbtCompound());
-                // 1.21.5+ decoding: use MAP_CODEC with RegistryOps
-                ItemStack stack = itemTag.decode(ItemStack.MAP_CODEC, registryOps)
-                        .orElse(ItemStack.EMPTY);
+                NbtElement itemNbt = hotbarList.get(i);
+                ItemStack stack = ItemStack.CODEC.parse(registryOps, itemNbt).getOrThrow();
                 client.player.getInventory().setStack(i, stack);
             }
 
             client.player.playerScreenHandler.sendContentUpdates();
 
             client.player.sendMessage(
-                    Text.literal("✔ Hotbar restored!").formatted(Formatting.GREEN), true);
+                    Text.literal("✔ Slot " + (slot + 1) + " restored! ("
+                            + HotbarConfig.get().loadModifier + "+" + (slot + 1)
+                            + ") — Made by rackeldevs").formatted(Formatting.GREEN),
+                    true);
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             client.player.sendMessage(
-                    Text.literal("✘ Failed to load hotbar: " + e.getMessage()).formatted(Formatting.RED), true);
+                    Text.literal("✘ Failed to load: " + e.getMessage()).formatted(Formatting.RED), true);
             e.printStackTrace();
         }
     }
 
-    private File getHotbarFile(MinecraftClient client) {
+    private static File getHotbarFile(MinecraftClient client) {
         return new File(client.runDirectory, "hotbar.nbt");
     }
 }
